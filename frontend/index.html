@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3efe7">
+  <title>Frontend Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section id="auth-view" class="auth-layout">
+      <div class="auth-intro">
+        <div class="brand-mark">FC</div>
+        <p class="eyebrow">A quieter place to talk</p>
+        <h1>Messages with room to breathe.</h1>
+        <p class="intro-copy">Frontend Chat keeps your conversations close, clear, and pleasantly out of the way.</p>
+        <div class="signal"><span></span> Private by default</div>
+      </div>
+      <div class="auth-panel">
+        <div class="auth-tabs" role="tablist">
+          <button class="tab active" data-auth-mode="login">Sign in</button>
+          <button class="tab" data-auth-mode="register">Create account</button>
+        </div>
+        <form id="auth-form">
+          <div id="name-field" class="field hidden"><label for="name">Your name</label><input id="name" autocomplete="name" placeholder="Ada Lovelace"></div>
+          <div class="field"><label for="email">Email address</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required></div>
+          <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="8 characters minimum" required></div>
+          <button class="primary-button" type="submit"><span id="auth-submit-label">Enter Frontend Chat</span><span aria-hidden="true">&#8599;</span></button>
+          <p id="auth-error" class="form-error" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="chat-view" class="chat-layout hidden">
+      <aside class="sidebar">
+        <div class="sidebar-top"><div class="brand"><span class="brand-mark small">FC</span><span>Frontend Chat</span></div><div class="top-actions"><button id="notifications-button" class="icon-button notification-button" title="Notifications" aria-label="Notifications">&#9673;<span id="notification-count" class="notification-count hidden">0</span></button><button id="logout" class="icon-button" title="Sign out" aria-label="Sign out">&#8594;</button></div></div>
+        <div class="profile"><div id="profile-avatar" class="avatar">U</div><div><strong id="profile-name">User</strong><span id="profile-email">email</span></div><span class="online-dot"></span></div>
+        <div class="section-label"><span>Conversations</span><button id="new-chat" class="new-chat" title="Start a new conversation" aria-label="Start a new conversation">+</button></div>
+        <label class="search-box"><span aria-hidden="true">&#9906;</span><input id="conversation-search" placeholder="Search conversations"></label>
+        <div id="conversation-list" class="conversation-list"></div>
+        <div class="sidebar-foot"><span class="status-pulse"></span> Live sync on</div>
+      </aside>
+
+      <section class="conversation-pane">
+        <header class="conversation-header"><div><p class="eyebrow">Conversation</p><h2 id="conversation-title">Select a conversation</h2><span id="conversation-meta" class="muted">Your messages will appear here</span></div><button class="icon-button" title="Conversation details" aria-label="Conversation details">&#8942;</button></header>
+        <div id="message-list" class="message-list"><div class="empty-state"><div class="empty-icon">&#10132;</div><h3>Pick a conversation</h3><p>Choose a thread from the left, or start a new one.</p></div></div>
+        <form id="message-form" class="composer"><input id="message-input" autocomplete="off" placeholder="Write a message..." disabled><button id="send-button" class="send-button" type="submit" title="Send message" aria-label="Send message" disabled>&#8593;</button></form>
+      </section>
+
+      <aside id="new-chat-panel" class="new-chat-panel hidden"><div class="panel-heading"><div><p class="eyebrow">Start something new</p><h3>New conversation</h3></div><button id="close-new-chat" class="icon-button" aria-label="Close">&#10005;</button></div><p class="muted">Find someone from your Frontend Chat circle.</p><input id="user-search" class="panel-input" placeholder="Search by name or email"><div id="user-results" class="user-results"></div></aside>
+      <aside id="notifications-panel" class="new-chat-panel notifications-panel hidden"><div class="panel-heading"><div><p class="eyebrow">Stay in the loop</p><h3>Notifications</h3></div><button id="close-notifications" class="icon-button" aria-label="Close">&#10005;</button></div><button id="mark-notifications-read" class="read-button">Mark all as read</button><div id="notification-list" class="notification-list"></div></aside>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/frontend/app.js"></script>
+</body>
+</html>
