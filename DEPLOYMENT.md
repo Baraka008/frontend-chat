@@ -25,9 +25,18 @@ DATABASE_PATH=/var/data/frontend_chat.db
 
 The current FastAPI service is SQLite-backed for local development. To use Supabase as the database instead of the local compatibility database, the next migration step is replacing the connection layer with the Supabase Postgres connection string or Supabase server client. The SQL schema is included now so the data model and RLS rules are versioned before that switch.
 
-## Frontend hosting
+## Netlify frontend hosting
 
-The current frontend is served by FastAPI and works on the same origin. For a static frontend host, set the API origin in `frontend/app.js` or replace it with a build-time `VITE_API_URL`, and configure the API host's CORS allowlist to the exact frontend origin.
+Netlify hosts the static frontend. The FastAPI API and WebSocket server must run separately on Render, Railway, Fly.io, or another application host.
+
+1. In Netlify, choose **Add new site > Import an existing project** and select this GitHub repository.
+2. Netlify will use `netlify.toml`: publish directory `frontend`, build command `python scripts/build_netlify.py`.
+3. Add the environment variable `FRONTEND_CHAT_API_URL` with the public FastAPI origin, for example `https://frontend-chat-api.example.com`. Do not include a trailing slash.
+4. Deploy the site. The build creates `frontend/config.js`, which points the browser client at the API.
+5. Set the API host's `CORS_ORIGINS` to the exact Netlify URL, for example `https://your-site.netlify.app`.
+6. Ensure the API host supports WebSocket upgrades at `/ws`. The browser will use `wss://` automatically when the API URL is HTTPS.
+
+Netlify cannot run the current FastAPI process. Do not put `JWT_SECRET`, a database path, or a Supabase service-role key in Netlify variables. Only the public API origin belongs in `FRONTEND_CHAT_API_URL`.
 
 ## GitHub
 

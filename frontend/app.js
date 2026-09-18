@@ -1,4 +1,4 @@
-const API = window.location.port === '8000' ? '' : 'http://127.0.0.1:8000';
+const API = window.FRONTEND_CHAT_API || (window.location.port === '8000' ? '' : 'http://127.0.0.1:8000');
 const state = { token: localStorage.getItem('frontend-chat-token'), user: null, conversations: [], selectedId: null, socket: null, authMode: 'login', notifications: [], unreadNotifications: 0, typingTimer: null, pending: false };
 const $ = (selector) => document.querySelector(selector);
 const initials = (name = 'User') => name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
