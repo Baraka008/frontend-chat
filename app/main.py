@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 from contextlib import asynccontextmanager
@@ -119,8 +120,20 @@ def init_database() -> None:
         ensure_columns(
             db,
             "users",
-            {"username": "TEXT", "avatar_url": "TEXT", "bio": "TEXT", "last_seen": "TEXT", "is_online": "INTEGER NOT NULL DEFAULT 0"},
+            {
+                "username": "TEXT",
+                "phone_number": "TEXT",
+                "avatar_url": "TEXT",
+                "bio": "TEXT",
+                "last_seen": "TEXT",
+                "is_online": "INTEGER NOT NULL DEFAULT 0",
+                "notifications_enabled": "INTEGER NOT NULL DEFAULT 1",
+                "read_receipts_enabled": "INTEGER NOT NULL DEFAULT 1",
+                "theme": "TEXT NOT NULL DEFAULT 'light'",
+            },
         )
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_idx ON users(username) WHERE username IS NOT NULL")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone_idx ON users(phone_number) WHERE phone_number IS NOT NULL")
         ensure_columns(
             db,
             "messages",
@@ -163,11 +176,15 @@ def user_view(row: sqlite3.Row) -> dict[str, Any]:
         "id": row["id"],
         "name": row["name"],
         "username": row["username"],
+        "phone_number": row["phone_number"],
         "email": row["email"],
         "avatar_url": row["avatar_url"],
         "bio": row["bio"],
         "last_seen": row["last_seen"],
         "is_online": bool(row["is_online"]),
+        "notifications_enabled": bool(row["notifications_enabled"]),
+        "read_receipts_enabled": bool(row["read_receipts_enabled"]),
+        "theme": row["theme"],
         "created_at": row["created_at"],
     }
 
@@ -176,11 +193,33 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    username: str | None = Field(default=None, min_length=3, max_length=30)
+    phone_number: str | None = Field(default=None, max_length=20)
 
     @field_validator("name")
     @classmethod
     def clean_name(cls, value: str) -> str:
         return " ".join(value.split())
+
+    @field_validator("username")
+    @classmethod
+    def clean_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip().lower()
+        if not re.fullmatch(r"[a-z0-9_]+", value):
+            raise ValueError("Username may only contain letters, numbers, and underscores")
+        return value
+
+    @field_validator("phone_number")
+    @classmethod
+    def clean_phone(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        value = re.sub(r"[\s().-]", "", value)
+        if not re.fullmatch(r"\+?[0-9]{7,15}", value):
+            raise ValueError("Enter a valid phone number")
+        return value
 
 
 class LoginRequest(BaseModel):
@@ -213,11 +252,18 @@ class ProfileRequest(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=30)
     bio: str | None = Field(default=None, max_length=160)
     avatar_url: str | None = Field(default=None, max_length=2000)
+    phone_number: str | None = Field(default=None, max_length=20)
 
     @field_validator("name", "username", "bio")
     @classmethod
     def clean_text(cls, value: str | None) -> str | None:
         return " ".join(value.split()) if value is not None else value
+
+
+class SettingsRequest(BaseModel):
+    notifications_enabled: bool | None = None
+    read_receipts_enabled: bool | None = None
+    theme: str | None = Field(default=None, pattern="^(light|dark|system)$")
 
 
 class ReactionRequest(BaseModel):
@@ -299,8 +345,8 @@ def register(payload: RegisterRequest) -> dict[str, Any]:
     with connection() as db:
         try:
             cursor = db.execute(
-                "INSERT INTO users(name, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
-                (payload.name, email, hash_password(payload.password), now_iso()),
+                "INSERT INTO users(name, email, password_hash, username, phone_number, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (payload.name, email, hash_password(payload.password), payload.username, payload.phone_number, now_iso()),
             )
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="Email is already registered") from exc
@@ -333,9 +379,28 @@ def update_profile(payload: ProfileRequest, user: sqlite3.Row = Depends(current_
             duplicate = db.execute("SELECT 1 FROM users WHERE username = ? AND id != ?", (updates["username"], user["id"])).fetchone()
         if duplicate:
             raise HTTPException(status_code=409, detail="Username is already taken")
+    if "phone_number" in updates:
+        updates["phone_number"] = re.sub(r"[\s().-]", "", updates["phone_number"]) if updates["phone_number"] else None
+        with connection() as db:
+            duplicate = db.execute("SELECT 1 FROM users WHERE phone_number = ? AND id != ?", (updates["phone_number"], user["id"])).fetchone()
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Phone number is already registered")
     assignments = ", ".join(f"{field} = ?" for field in updates)
     with connection() as db:
         db.execute(f"UPDATE users SET {assignments} WHERE id = ?", [*updates.values(), user["id"]])
+        updated = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {"user": user_view(updated)}
+
+
+@app.patch("/me/settings")
+def update_settings(payload: SettingsRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        return {"user": user_view(user)}
+    assignments = ", ".join(f"{field} = ?" for field in updates)
+    values = [int(value) if isinstance(value, bool) else value for value in updates.values()]
+    with connection() as db:
+        db.execute(f"UPDATE users SET {assignments} WHERE id = ?", [*values, user["id"]])
         updated = db.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
     return {"user": user_view(updated)}
 
@@ -375,9 +440,9 @@ def search_users(q: str = Query(default="", max_length=80), user: sqlite3.Row = 
         pattern = f"%{q.strip().lower()}%"
         rows = db.execute(
             """SELECT * FROM users
-                WHERE id != ? AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ?)
+                WHERE id != ? AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ? OR phone_number LIKE ?)
                 ORDER BY name LIMIT 20""",
-            (user["id"], pattern, pattern, pattern),
+            (user["id"], pattern, pattern, pattern, pattern),
         ).fetchall()
     return [user_view(row) for row in rows]
 

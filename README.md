@@ -16,11 +16,12 @@ Open `http://127.0.0.1:8000/` for the chat app or `http://127.0.0.1:8000/docs` f
 
 ## API
 
-- `POST /auth/register` creates a user and returns a JWT.
+- `POST /auth/register` creates a user with optional username and phone number and returns a JWT.
 - `POST /auth/login` returns a JWT.
 - `GET /me` returns the authenticated profile.
-- `PATCH /me/profile` updates name, username, bio, and avatar URL.
-- `GET /users?q=...` searches users available for a new conversation.
+- `PATCH /me/profile` updates name, username, phone number, bio, and avatar URL.
+- `PATCH /me/settings` updates notification, read-receipt, and theme preferences.
+- `GET /users?q=...` searches users by name, email, username, or phone number.
 - `GET /users/{id}` returns a profile with follower/following counts.
 - `POST /users/{id}/follow` and `DELETE /users/{id}/follow` manage follows.
 - `GET /notifications` returns recent notifications and the unread count.
@@ -38,3 +39,7 @@ Open `http://127.0.0.1:8000/` for the chat app or `http://127.0.0.1:8000/docs` f
 The SQLite database is created automatically at `frontend_chat.db`.
 
 The frontend lives in `frontend/` and is served by the FastAPI app. It supports registration, login, conversation search, message history, sending messages, notifications, logout, and realtime WebSocket updates. The backend is designed around shared messaging primitives used by WhatsApp and Instagram DMs without depending on either platform.
+
+## Production
+
+The Supabase production schema and row-level security policies are in [supabase/schema.sql](supabase/schema.sql). Deployment architecture and environment setup are documented in [DEPLOYMENT.md](DEPLOYMENT.md). Supabase provides the database, authentication, and realtime services; the FastAPI process must run on an application host such as Render, Railway, or Fly.io.
