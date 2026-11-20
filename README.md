@@ -1,8 +1,8 @@
 # Frontend Chat
 
-A complete local chat app with a Python backend and browser frontend.
+A local FastAPI + browser chat prototype with registration, conversations, messages, reactions, notifications and WebSocket updates.
 
-## Run
+## Local setup
 
 ```powershell
 py -m venv .venv
@@ -12,34 +12,33 @@ Copy-Item .env.example .env
 py -m uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/` for the chat app or `http://127.0.0.1:8000/docs` for the interactive API.
+Open `http://127.0.0.1:8000/` for the app and `http://127.0.0.1:8000/docs` for API documentation.
 
-## API
+## Environment and security
 
-- `POST /auth/register` creates a user with optional username and phone number and returns a JWT.
-- `POST /auth/login` returns a JWT.
-- `GET /me` returns the authenticated profile.
-- `PATCH /me/profile` updates name, username, phone number, bio, and avatar URL.
-- `PATCH /me/settings` updates notification, read-receipt, and theme preferences.
-- `GET /users?q=...` searches users by name, email, username, or phone number.
-- `GET /users/{id}` returns a profile with follower/following counts.
-- `POST /users/{id}/follow` and `DELETE /users/{id}/follow` manage follows.
-- `GET /notifications` returns recent notifications and the unread count.
-- `POST /notifications/read-all` marks the current user's notifications as read.
-- `POST /conversations` creates a direct or group conversation.
-- `GET /conversations` lists conversations for the current user.
-- `GET /conversations/{id}/messages` reads paginated message history.
-- `POST /conversations/{id}/messages` sends text, reply, or attachment metadata and broadcasts it over WebSocket.
-- `POST /conversations/{id}/read` marks incoming messages as read.
-- `POST /messages/{id}/reactions` and `DELETE /messages/{id}/reactions` manage emoji reactions.
-- `WS /ws?token=<jwt>` receives live `message.created` events for joined conversations.
-- WebSocket also supports `typing.start`, `typing.stop`, `presence.changed`, `conversation.read`, `message.reaction`, and `message.reaction_removed` events.
-- `GET /health` reports service status.
+- Set `JWT_SECRET` to a random secret of at least 32 characters for production.
+- Set `APP_ENV=production` in production. The app refuses to start with a weak or missing production JWT secret.
+- Set `CORS_ORIGINS` to the exact trusted frontend origins. Wildcard CORS is rejected in production.
+- Never commit `.env` or share JWT secrets.
 
-The SQLite database is created automatically at `frontend_chat.db`.
+## Current storage limitation
 
-The frontend lives in `frontend/` and is served by the FastAPI app. It supports registration, login, conversation search, message history, sending messages, notifications, logout, and realtime WebSocket updates. The backend is designed around shared messaging primitives used by WhatsApp and Instagram DMs without depending on either platform.
+The current API implementation uses SQLite. It is suitable for local development and single-instance demos, not a horizontally scaled production chat service. A production deployment needs a durable persistent disk at minimum, and ideally a PostgreSQL repository adapter plus shared realtime/pub-sub infrastructure. The Supabase SQL schema is a reference and is not yet wired into the current Python data-access layer.
 
-## Production
+## Deployment
 
-The Supabase production schema and row-level security policies are in [supabase/schema.sql](supabase/schema.sql). Deployment architecture and environment setup are documented in [DEPLOYMENT.md](DEPLOYMENT.md). Supabase provides the database, authentication, and realtime services; the FastAPI process must run on an application host such as Render, Railway, or Fly.io.
+The FastAPI app serves the frontend from `frontend/` and should run as a persistent web service on Render or Railway, not as a static Vercel deployment. Use `uvicorn app.main:app --host 0.0.0.0 --port $PORT` and configure a persistent storage path for SQLite for demo use.
+
+## API overview
+
+- `POST /auth/register` and `POST /auth/login`
+- `GET /me`, `PATCH /me/profile`, `PATCH /me/settings`
+- User search, profiles and follow/unfollow
+- Conversations, paginated messages and reactions
+- Notifications and read receipts
+- `WS /ws?token=<jwt>` for live conversation events
+- `GET /health`
+
+## Checks
+
+GitHub Actions runs Python bytecode compilation and the pytest suite when a tests directory is present.
