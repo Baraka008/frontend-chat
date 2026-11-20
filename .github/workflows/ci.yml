@@ -1,0 +1,20 @@
+name: Frontend Chat CI
+on:
+  push:
+    branches: [main, chore/repository-audit-and-polish]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m compileall -q app
+      - run: if [ -d tests ]; then python -m pytest -q; else echo "No tests directory yet; compile check passed."; fi

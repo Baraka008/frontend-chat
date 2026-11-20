@@ -24,10 +24,17 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "frontend_chat.db"))
-JWT_SECRET = os.getenv("JWT_SECRET", "frontend-chat-development-secret")
+APP_ENV = os.getenv("APP_ENV", "development").lower()
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(BASE_DIR / "frontend_chat.db")))
+JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
+
+if APP_ENV == "production" and (len(JWT_SECRET) < 32 or JWT_SECRET == "frontend-chat-development-secret"):
+    raise RuntimeError("Production requires a strong JWT_SECRET of at least 32 characters.")
+
+if not JWT_SECRET:
+    JWT_SECRET = "frontend-chat-development-secret"
 
 
 def now_iso() -> str:
@@ -329,8 +336,17 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Frontend Chat API", version="1.0.0", lifespan=lifespan)
-origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",")]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+default_origins = "http://127.0.0.1:8000,http://localhost:8000"
+origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", default_origins).split(",") if origin.strip()]
+if APP_ENV == "production" and "*" in origins:
+    raise RuntimeError("Production CORS_ORIGINS must list trusted origins; wildcard CORS is not allowed.")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials="*" not in origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 app.mount("/frontend", StaticFiles(directory=BASE_DIR / "frontend"), name="frontend")
 
 
